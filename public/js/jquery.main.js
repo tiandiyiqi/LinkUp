@@ -1,7 +1,6 @@
 // A 100% javascript facebook/gmail style web chat.
 // (c) 2014-2015 Ezequiel Lovelle [ezequiellovelle@gmail.com]
 // released under the MIT license
-
 (function( $ ) {
 //定义一系列变量 
   var chat_stat = 0,
@@ -580,14 +579,15 @@
     }
 
 
-    // function autofill(){
-    //   //alert("autofill");
-    //     var my_name=document.getElementById("name");
-    //     var my_email=document.getElementById("email");
-    //     my_name.value = "user";
-    //     my_email.value = "user";
-    // }
-    
+    function autofill(){
+      //alert("autofill");
+        var my_name=document.getElementById("name");
+        var my_email=document.getElementById("email");
+        my_name.value = "user";
+        my_email.value = "user";
+    }
+
+
     //Change text for lang   改变文本语言
     function main_chat_set_dialog_lang ( dialogid ) {
       dialogid.parent().find( "#warning-alert" ).text( i18n.alert + " " );//Set text 'alert'
@@ -727,6 +727,39 @@
 
             });
 
+            // 发送文件
+            main.find( "#sendFile").first().on('change', function() {
+                if (this.files.length != 0) {
+                  var file = this.files[0];
+                  filename = file.name;
+                  filetype = file.type;
+                    reader = new FileReader();
+                  if (!reader) {
+                    this.value = '';
+                    return;
+                  };
+                  reader.onload = function(e) {
+                    var msg = e.target.result;
+                    
+                    if (msg !== "") {
+                    main.parent().find( "#progressbar-char" ).progressbar( "option", "value", 0 );
+                    socket.emit('file', { 'user': user, 'msg': msg, 'filename': filename, 'filetype': filename }, function (data) {
+                    var recv = JSON.parse(data);
+                    var msg1  = e.target.result;
+                    append_file_me(msg1, main, recv.date, filename, filetype);
+                    // FIXME
+                    // Set dialog position
+                    main.dialog( "option", "position", { my: "right bottom", at: "right top-3", of: "#user-button-"+id, collision: "flip, none" });
+                  });
+                }
+               };
+                  reader.readAsArrayBuffer(file);
+                 
+                };
+              
+
+            });
+
             //Init char progress bar  初始化进度条
             $( this ).find( "#progressbar-char" ).first().progressbar({ value: 0 });
           }
@@ -839,6 +872,38 @@
       new_scroll(scroll);
     }
 
+    function append_file_me ( msg, main, date, filename , filetype ) {  
+      var blob = new Blob([msg], { "type" : filetype });  
+      var a = document.createElement("a");
+      a.href = window.URL.createObjectURL(blob);
+      a.download = filename; 
+      a.textContent = filename;  
+      a.textContent.color = "blue";
+      a.id = "direct-chat-file";
+      //
+      var box = main.parent().find(".box-body");
+      var me = box.find('.direct-chat-messages').last();
+      var scroll = main.parent().find( ".direct-chat-messages" );
+      if (me.children().last().attr('id') == 'me') {
+        me.children().find('.direct-chat-text').last().append(a);
+      } else {
+        me.append("\
+          <div class='direct-chat-msg right' id='me'>\
+            <div class='direct-chat-info clearfix'>\
+              <span class='direct-chat-name pull-right'>" + user_name + "</span>\
+              <span class='direct-chat-timestamp pull-left'>" + get_format_date(date) + "</span>\
+            </div>\
+            <img class='direct-chat-img' src='" + user_avatar + "' alt='message user image' />\
+            <div class='direct-chat-text'>\
+            </div>\
+          </div>");
+        me.children().find('.direct-chat-text').last().append(a);
+      };
+
+      // Go to bottom
+      new_scroll(scroll);
+    }
+
     function append_msg_he ( msg, main, name, date, avatar ) {
       var fullname = '';
       var fname = name.split(' ');
@@ -899,6 +964,44 @@
       // Go to bottom
       new_scroll(scroll);
     }
+
+    function append_file_he ( msg, main, name, date, avatar, filename , filetype) {
+      var blob = new Blob([msg], { "type" : filetype });  
+      var a = document.createElement("a");
+      a.id = "direct-chat-file";
+      a.href = window.URL.createObjectURL(blob);
+      a.download = filename; 
+      a.textContent = filename;  
+      //
+      var fullname = '';
+      var fname = name.split(' ');
+      var box = main.parent().find(".box-body");
+      var he = box.find('.direct-chat-messages').last();
+      var scroll = main.parent().find( ".direct-chat-messages" );
+
+      if (fname.length == 2) fullname = fname[0] + " " + fname[1];
+      else fullname = fname[0];
+
+      if (he.children().last().attr('id') == 'he') {
+        he.children().find('.direct-chat-text').last().append(a);
+      } else {
+        he.append("\
+          <div class='direct-chat-msg' id='he'>\
+            <div class='direct-chat-info clearfix'>\
+              <span class='direct-chat-name pull-left'>" + fullname + "</span>\
+              <span class='direct-chat-timestamp pull-right'>" + get_format_date(date) + "</span>\
+            </div>\
+            <img class='direct-chat-img' src='" + avatar + "' alt='message user image' />\
+            <div class='direct-chat-text' color='blue'>\
+            </div>\
+          </div>");
+        he.children().find('.direct-chat-text').last().append(a);
+      };
+
+      // Go to bottom
+      new_scroll(scroll);
+    }
+
     function new_scroll(s) {
       var sint = s.prop('scrollHeight') + 'px';
       s.slimScroll({
@@ -1136,18 +1239,25 @@
               <div class='small-box-footer'>\
                 <textarea id='textarea_msg' class='form-control textarea-msg' name='message'  placeholder='"+ i18n.type_message +"'></textarea>\
               </div>\
-              <div class='_box'>选择图片…</div>\
+              <div>\
+              <div class='boxs' id='_box1'>发送图片…</div>\
+              <div class='boxs'>     </div>\
+              <div class='boxs' id='_box2'>发送文件…</div>\
               </div>\
               <div class='none'>\
               <input id='sendImage' type='file' value='image'/>\
+              <input id='sendFile' type='file' value='otherfile'/>\
               </div>\
             </div>\
           </div>\
           <script type='text/javascript'>\
           jQuery(function () {\
           var my=$(id='#Dialog" + id + "');\
-          my.find('._box').click(function () {\
+          my.find('#_box1').click(function () {\
           my.find('#sendImage').click();\
+          });\
+          my.find('#_box2').click(function () {\
+          my.find('#sendFile').click();\
           });\
           });\
           </script>");
@@ -1550,6 +1660,19 @@
       chat_reconnect = 0;
     }
 
+    function ab2str(buf) {
+      return String.fromCharCode.apply(null, new Uint16Array(buf));
+    }
+
+    function str2ab(str) {
+      var buf = new ArrayBuffer(str.length*2); // 2 bytes for each char
+      var bufView = new Uint16Array(buf);
+      for (var i=0, strLen=str.length; i<strLen; i++) {
+        bufView[i] = str.charCodeAt(i);
+      }
+      return buf;
+    }
+
     /***************** incoming events **************************/
     //信息处理
     function handle_incoming(recv) {
@@ -1563,6 +1686,7 @@
         var avatar = recv.data.user.avatar;
         var msg    = recv.data.msg;
         var main   = $( "#Dialog" + iduser );
+       
 
         //Do nothing if user is offline
         // TODO:
@@ -1601,14 +1725,6 @@
         var msg    = recv.data.msg;
         var main   = $( "#Dialog" + iduser );
 
-        t_date   = recv.date;
-        t_iduser = recv.data.user.uid;
-        t_name   = recv.data.user.name;
-        t_status = recv.data.user.status;
-        t_vatar = recv.data.user.avatar;
-        t_msg    = recv.data.msg;
-        t_main   = $( "#Dialog" + iduser );
-
         //Do nothing if user is offline
         // TODO:
         /*if ( status == 'offline' )
@@ -1631,6 +1747,47 @@
         }
         //追加信息
         append_img_he( msg, main, name, date, avatar );
+        // FIXME
+        // Set dialog position
+        main.dialog( "option", "position", { my: "right bottom", at: "right top-3", of: "#user-button-"+iduser, collision: "flip, none" });
+      }
+
+      //发送图片
+      else if (action == 'file') {
+
+        var date   = recv.date;
+        var iduser = recv.data.user.uid;
+        var name   = recv.data.user.name;
+        var status = recv.data.user.status;
+        var avatar = recv.data.user.avatar;
+        var msg    = recv.data.msg;
+        var filename  = recv.data.filename;
+        var filetype  = recv.data.filetype;
+
+        alert(filename+"  "+filename);
+        var main   = $( "#Dialog" + iduser );
+        //Do nothing if user is offline
+        // TODO:
+        /*if ( status == 'offline' )
+          return false;*/
+        //Append div user in the bar if is not appended   如果工具条上没有则增加一个
+        if ( $( "#users-button-bar" ).parent().find( "#user-button-" + iduser ).length == 0 ) {
+          $( "#users-button-bar" ).append( "<button id='user-button-" + iduser + "' class='user-button' style='font-size: 65%;'><li class='" + status + "'>" + name + "</li></button>" );
+          $( ".user-button" ).button();
+        }
+
+        //Check focus state and focus document to do sound and alert   如果当前打开状态下则发出声音和警告
+        if( !$(document).is(document.activeElement) || !main.find( "#textarea_msg" ).is(document.activeElement) ) {
+          //Do sound effect
+          //if sounds has been disabled, dont do it   如果声音已被禁用，不要这样做
+          if ( conf_sound_active == true )
+            $( "#audio-popup" ).trigger( "play" );
+
+          //Add notification if not exist 如果不存在添加通知
+          main_chat_user_alert( iduser, 0 );
+        }
+        //追加信息
+        append_file_he( msg, main, name, date, avatar , filename , filetype);
         // FIXME
         // Set dialog position
         main.dialog( "option", "position", { my: "right bottom", at: "right top-3", of: "#user-button-"+iduser, collision: "flip, none" });

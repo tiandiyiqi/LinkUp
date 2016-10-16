@@ -101,6 +101,16 @@ io.sockets.on('connection', function (socket) {
 			fn(JSON.stringify( {'ack': 'true', 'date': d} ));
 		io.sockets.socket(id).emit('chat', JSON.stringify( {'action': 'img', 'data': msg, 'date': d} ));
 	});
+   //接收用户发来的文件
+	socket.on('file', function (recv, fn) {
+		var d = new Date();
+		var id = socks[recv.user].socket.id;
+		var msg = {'msg': recv.msg,'filename': recv.filename, 'filetype': recv.filetype, 'user': users[socket.user]};
+		if (typeof fn !== 'undefined')
+			fn(JSON.stringify( {'ack': 'true', 'date': d} ));
+		io.sockets.socket(id).emit('chat', JSON.stringify( {'action': 'file', 'data': msg, 'date': d} ));
+	});
+
 	//
 });
 
